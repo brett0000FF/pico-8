@@ -4,12 +4,9 @@ __lua__
 --main
 function _init()
  game_state = "menu"
- 
  init_player()
  init_stars()
- init_enemies()
- init_levels()  -- initialize level system
- load_level(1)  -- load first level
+ init_game_progression() -- new function replacing init_levels()
  score = 0
  explosions = {}
  music(0)
@@ -22,8 +19,7 @@ function _update()
   if btnp(❎) or btnp(🅾️) then
    game_state = "playing"
    sfx(7)
-  -- sfx(6)
-  -- music(-1)
+   music(-1)
   end
  end
  
@@ -31,13 +27,13 @@ function _update()
   update_player()
   update_missiles()
   update_particles()
+  update_enemy_spawning()
   update_enemies()
   update_explosions()
-  check_level_complete()
- elseif game_state == "won" then
-  -- handle game complete state
-  if btnp(5) then
-   _init() -- restart game
+  update_difficulty()
+ elseif game_state == "game_over" then
+  if btnp(❎) then
+   _init()
   end
  end
 end
@@ -46,17 +42,18 @@ function _draw()
  cls(0)
  draw_stars()
  if game_state == "menu" then
- 	draw_menu()
+  draw_menu()
  elseif game_state == "playing" then
   draw_enemies()
   draw_player()
   draw_missiles()
   draw_explosions()
   print("score:"..score,2,2,7)
- elseif game_state == "won" then
-  print("game complete!",35,60,7)
-  print("score:"..score,40,70,7)
-  print("press ❎ to restart",25,80,7)
+  print("wave:"..flr(difficulty),2,8,7)
+ elseif game_state == "game_over" then
+  print("game over!",45,50,7)
+  print("score:"..score,45,60,7)
+  print("press ❎ to restart",30,70,7)
  end
 end
 -->8
@@ -84,21 +81,21 @@ function update_player()
  if btn(➡️) then
   dx+=2
   current_state = "right"
-  sfx(7)
+  sfx(8,2)
  elseif btn(⬅️) then
   dx-=2
   current_state = "left"
-  sfx(7)
+  sfx(8,2)
  else
  	current_state = "straight"
- 	sfx(7)
+ 	sfx(-1,2)
  end
  if btn(⬆️) then
   dy-=2
-  sfx(7)
+  sfx(8,2)
  elseif btn(⬇️) then
   dy+=2
-  sfx(7)
+  sfx(8,2)
  end
  
   -- create engine trails
@@ -223,24 +220,72 @@ end
 function update_enemies()
  for enemy in all(enemies) do
   if enemy.alive then
-   enemy.t += enemy.speed
+   enemy.t += .02
    enemy.x = enemy.base_x + cos(enemy.t) * enemy.amplitude
+   enemy.y += enemy.dy
+   
+   if enemy.y > 128 then
+    del(enemies, enemy)
+   end
+   
+   -- update collision check with proper player dimensions
+   if check_collision(enemy, {x=x,y=y,w=8,h=8}) then
+    game_state = "game_over"
+   end
   end
+ end
+end
+
+-- in init_game_progression()
+function init_game_progression()
+ enemies = {}
+ spawn_timer = 0
+ difficulty = 1
+ time_survived = 0
+ spawn_interval = 90  -- increased from 60 to spawn less frequently
+ max_enemies = 5
+end
+
+function update_enemy_spawning()
+ spawn_timer += 1
+ if spawn_timer >= spawn_interval and #enemies < max_enemies then
+  spawn_timer = 0
+  local enemy_type = flr(rnd(3)) + 1
+  local enemy_x = rnd(112) + 8  -- store x position in variable
+  
+  add(enemies, {
+   x = enemy_x,
+   y = -8,
+   base_x = enemy_x,  -- use the stored x position
+   t = rnd(1),
+   amplitude = 5 + rnd(3),
+   speed = 0.2 + difficulty * 0.1,
+   sprite = 2 + enemy_type,  -- this will give us sprites 3, 4, or 5
+   alive = true,
+   points = 50 * enemy_type * difficulty,
+   dy = 0.5 + rnd(0.5),
+   w = 8,
+   h = 8
+  })
+ end
+ 
+   dy = 0.2 + rnd(0.3)  -- reduced from 0.5 + rnd(0.5)
+
+end
+
+function update_difficulty()
+ time_survived += 1
+ if time_survived % 900 == 0 then
+  difficulty += 0.5
+  max_enemies = min(5 + flr(difficulty), 12)
+  spawn_interval = max(60 - flr(difficulty * 5), 20)
  end
 end
 
 function draw_enemies()
  for enemy in all(enemies) do
   if enemy.alive then
-   if current_level == 1 then
-    spr(3,enemy.x,enemy.y)
-   end
-   if current_level == 2 then
-    spr(4,enemy.x,enemy.y)
-   end
-   if current_level == 3 then
-    spr(5,enemy.x,enemy.y)
-   end
+   spr(enemy.sprite, enemy.x, enemy.y)
   end
  end
 end
@@ -483,13 +528,15 @@ end
 -->8
 --menus
 function draw_menu()
- local title = "space taste"
+ local title = "deep space 99"
  local instruct = "press ❎ to start" 
  print(title, center(title), 48, 7)
 
  if t() % 1 < 0.7 then
   print(instruct, center(instruct), 90, 12)
  end
+ 
+ 
 end
 -->8
 -- extras
@@ -521,7 +568,8 @@ __sfx__
 0028000a0c0500e050110501005011050130500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0028000a0190000050000500000000050000500001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 002800000c1500e150111501015011150131500010000100001000010000100001000010000100001000010000100001000010000100001000010000100001000010000100001000010000100001000010000100
-001000002b0501000000000000001d0001d0001d0001d0001d000300002f0002d0002c0002a000280002800000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0006000013050160501b05034000380001d0001d0001d0001d000300002f0002d0002c0002a000280002800000000000000000000000000000000000000000000000000000000000000000000000000000000000
+900900000c5230c5230c5231950319503195031950319503195031950319503195031950319503195031b50319503175031650314503135031250312503145031950300503005030050300503005030050300503
 __music__
 00 05044344
 
