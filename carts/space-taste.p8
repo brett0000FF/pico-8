@@ -95,6 +95,30 @@ function update_player()
   dy+=2
  end
  
+  -- create engine trails
+ -- only emit particles every other frame
+ if (dx != 0 or dy != 0) and t() % 0.1 < 0.05 then
+  -- left engine
+  add(particles, {
+   x=x+2,
+   y=y+7,
+   dx=rnd(0.2)-0.1,
+   dy=0.5+rnd(0.5),
+   life=3+rnd(2),
+   color=rnd({9,10}) -- orange/yellow colors
+  })
+  
+  -- right engine
+  add(particles, {
+   x=x+5.5,
+   y=y+7,
+   dx=rnd(0.2)-0.1,
+   dy=0.5+rnd(0.5),
+   life=3+rnd(2),
+   color=rnd({9,10}) -- orange/yellow colors
+  })
+ end
+ 
  if dx != 0 and dy != 0 then
   dx *= 0.7071 -- approximation of 1/ヌ☉あ2
   dy *= 0.7071
@@ -203,13 +227,13 @@ function draw_enemies()
  for enemy in all(enemies) do
   if enemy.alive then
    if current_level == 1 then
-   spr(3,enemy.x,enemy.y)
+    spr(3,enemy.x,enemy.y)
    end
    if current_level == 2 then
-   spr(4,enemy.x,enemy.y)
+    spr(4,enemy.x,enemy.y)
    end
    if current_level == 3 then
-   spr(5,enemy.x,enemy.y)
+    spr(5,enemy.x,enemy.y)
    end
   end
  end
@@ -225,33 +249,61 @@ function check_collision(a, b)
 end
 
 function create_explosion(x, y)
-    add(explosions, {
-        x = x,
-        y = y,
-        frame = 18,  -- starting frame
-        timer = 0,
-        active = true
-    })
+ add(explosions, {
+  x = x,
+  y = y,
+  frame = 18,  -- starting frame
+  timer = 0,
+  active = true,
+  particles = {}
+ })
+    
+ for i=1,12 do
+  local angle = rnd()
+  local speed = 1 + rnd(2)
+  add(explosions[#explosions].particles, {
+   x = x + 4,  -- center of sprite
+   y = y + 4,
+   dx = cos(angle) * speed,
+   dy = sin(angle) * speed,
+   life = 10 + rnd(10),
+   color = rnd({8,9,10})
+  })
+ end
 end
 
 function update_explosions()
-    for e in all(explosions) do
-        e.timer += 1
-        -- change frame every 4 frames
-        if e.timer == 4 then
-            e.frame = 19
-        elseif e.timer == 8 then
-            e.frame = 20
-        elseif e.timer == 12 then
-            del(explosions, e)
-        end
-    end
+ for e in all(explosions) do
+  e.timer += 1
+  
+  if e.timer == 4 then
+   e.frame = 19
+  elseif e.timer == 8 then
+   e.frame = 20
+  elseif e.timer == 12 then
+   del(explosions, e)
+  end
+  
+  for p in all(e.particles) do
+   p.x += p.dx
+   p.y += p.dy
+   p.dx *= 0.9
+   p.dy *= 0.9
+   p.life -= 1
+   if p.life <= 0 then
+    del(e.particles, p)
+   end
+  end
+ end
 end
 
 function draw_explosions()
-    for e in all(explosions) do
-        spr(e.frame, e.x, e.y)
-    end
+ for e in all(explosions) do
+  spr(e.frame, e.x, e.y)
+  for p in all(e.particles) do
+   pset(p.x, p.y, p.color)
+  end
+ end
 end
 -->8
 --stars
